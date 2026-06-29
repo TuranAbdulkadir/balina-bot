@@ -75,3 +75,7 @@ weekend_analysis*.py
 strategy_latest.py
 init_git.ps1
 project_handover_prompt.txt
+
+fixed.env
+*.env.bak
+!.env.example
