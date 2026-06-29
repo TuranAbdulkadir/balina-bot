@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════
+# SECRETS & CREDENTIALS
+# ═══════════════════════════════════════
+.env
+*.pem
+*.key
+secrets/
+
+# ═══════════════════════════════════════
+# DATA & RESULTS (Large Files)
+# ═══════════════════════════════════════
+core/data_lake/
+backtest_data/
+backtest_results/
+core/simulation_results/
+logs/
+
+# ═══════════════════════════════════════
+# PROPRIETARY STRATEGY & ALPHA
+# ═══════════════════════════════════════
+execution/strategy_alpha.py
+core/mathematics.py
+core/kelly_manager.py
+core/ml_optimizer.py
+core/ml_inference.py
+core/backtest_engine.py
+core/trend_filter.py
+core/vpin.py
+core/zscore.py
+fetch_and_backtest.py
+quick_backtest.py
+auto_tuner.py
+optimize_profit.py
+
+# ═══════════════════════════════════════
+# PYTHON CACHE
+# ═══════════════════════════════════════
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ═══════════════════════════════════════
+# MISC
+# ═══════════════════════════════════════
+warmup_state.json
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+trace.txt
+
+# ═══════════════════════════════════════
+# DEV / TEST / UTILITY SCRIPTS
+# ═══════════════════════════════════════
+fix_*.py
+panic_*.py
+oracle_*.py
+test_*.py
+mock_*.py
+open_port.py
+parse_logs.py
+patch_loggers.py
+update_env.py
+update_tg.py
+check.py
+analyze_data.py
+engine_recovered.py
+export_handover.py
+generate_handover.py
+weekend_analysis*.py
+strategy_latest.py
+init_git.ps1
+project_handover_prompt.txt
