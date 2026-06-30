@@ -74,6 +74,32 @@ class BinanceRestClient:
         self.local_weight_1m += weight_cost
 
     async def _request_signed(self, method: str, endpoint: str, params: dict = None, weight_cost: int = 1) -> dict:
+        from core.config import DRY_RUN
+        import uuid
+        import time
+        import os
+
+        if DRY_RUN and endpoint in ("/fapi/v1/order", "/fapi/v1/allOpenOrders"):
+            logger.warning(f"🛡️ DRY_RUN BLOCKED HTTP: {method} {endpoint} -> {params}")
+            os.makedirs("core/data_lake", exist_ok=True)
+            with open("core/data_lake/dry_run_blocks.log", "a", encoding="utf-8") as f:
+                f.write(f"{time.time()} | 🛡️ DRY_RUN BLOCKED HTTP: {method} {endpoint} -> {params}\n")
+            
+            if endpoint == "/fapi/v1/allOpenOrders":
+                return {"code": 200, "msg": "Success"}
+            else:
+                p = params or {}
+                return {
+                    "orderId": int(time.time() * 1000) % 1000000000,
+                    "clientOrderId": p.get("newClientOrderId", f"SIM_{int(time.time() * 1000)}"),
+                    "status": "NEW",
+                    "executedQty": "0",
+                    "avgPrice": "0",
+                    "side": p.get("side", "BUY"),
+                    "type": p.get("type", "LIMIT"),
+                    "symbol": p.get("symbol", "BTCUSDT")
+                }
+
         await self._check_rate_limit(weight_cost)
         session = await self.get_session()
         params = params or {}

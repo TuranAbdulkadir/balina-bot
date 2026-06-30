@@ -177,6 +177,32 @@ async def main(data_queue: multiprocessing.Queue, signal_queue: multiprocessing.
     from execution.strategy_alpha import AlphaStrategy
     strategy = AlphaStrategy(engine, lob, reporter=reporter, trend_filter=trend_filter)
     
+    # ── AŞAMA: KALDIRAÇ ZORLAMA (GÜVENLİK KİLİDİ) ──
+    async def enforce_leverage(rest_client, symbol: str, target_leverage: int = 5):
+        logger.info(f"Enforcing strictly {target_leverage}x leverage for {symbol}...")
+        try:
+            from core.config import DRY_RUN
+            if DRY_RUN:
+                logger.info(f"DRY_RUN ACTIVE: Bypassing leverage POST, verifying only...")
+            else:
+                await rest_client.post_signed("/fapi/v1/leverage", {"symbol": symbol, "leverage": target_leverage})
+            
+            res = await rest_client.get_signed("/fapi/v2/positionRisk", {"symbol": symbol})
+            if res and isinstance(res, list) and len(res) > 0:
+                actual_leverage = int(res[0].get("leverage", 0))
+                if not DRY_RUN and actual_leverage != target_leverage:
+                    logger.critical(f"🚨 CRITICAL SECURITY FAULT: Leverage failed to set! Expected {target_leverage}x, got {actual_leverage}x")
+                    sys.exit("SECURITY_FAULT: Leverage mismatch.")
+                logger.info(f"✅ Leverage verification complete: {actual_leverage}x detected.")
+            else:
+                logger.critical("🚨 CRITICAL SECURITY FAULT: Could not verify positionRisk!")
+                sys.exit("SECURITY_FAULT: positionRisk fetch failed.")
+        except Exception as e:
+            logger.critical(f"🚨 CRITICAL SECURITY FAULT: Could not set leverage: {e}")
+            sys.exit(f"SECURITY_FAULT: {e}")
+
+    await enforce_leverage(rest_client, global_state_symbol, 5)
+    
     # AŞAMA 29: REST Kline Warmup — EMA ve RSI'ın doğru başlaması için geçmiş mumları yükle
     try:
         from core.config import KLINE_WARMUP_COUNT, KLINE_INTERVAL

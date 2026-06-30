@@ -42,12 +42,44 @@ class ExecutionEngine:
             self.locks[symbol] = asyncio.Lock()
         return self.locks[symbol]
 
+    def _sim_order(self, method_name: str, params: dict):
+        from core.config import DRY_RUN
+        import time
+        import os
+        logger.warning(f"🛡️ DRY_RUN BLOCKED: {method_name} -> {params}")
+        os.makedirs("core/data_lake", exist_ok=True)
+        with open("core/data_lake/dry_run_blocks.log", "a", encoding="utf-8") as f:
+            f.write(f"{time.time()} | 🛡️ DRY_RUN BLOCKED: {method_name} -> {params}\n")
+        
+        return {
+            "orderId": int(time.time() * 1000) % 1000000000,
+            "clientOrderId": params.get("newClientOrderId", f"SIM_{int(time.time() * 1000)}"),
+            "status": "NEW",
+            "executedQty": "0",
+            "avgPrice": "0",
+            "side": params.get("side", "BUY"),
+            "type": params.get("type", "LIMIT"),
+            "symbol": params.get("symbol", "BTCUSDT")
+        }
+
     def remove_from_tracking(self, client_order_id: str):
         """Red Team Patch: Prevents API Rate Limit Bomb by gracefully popping filled/canceled orders from Sweeper memory."""
         self.open_orders.pop(client_order_id, None)
 
     async def place_strict_maker(self, symbol: str, side: str, price: Decimal, quantity: Decimal, reduce_only: bool = False, lob=None):
         """Places a strict Maker (Post-Only) Limit Order. Taker execution is blocked by GTX."""
+        from core.config import DRY_RUN
+        
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "type": "LIMIT",
+            "quantity": str(quantity.quantize(Decimal('0.001'), rounding=ROUND_DOWN)),
+            "price": str(price.quantize(Decimal('0.01'), rounding=ROUND_DOWN))
+        }
+        if DRY_RUN:
+            return self._sim_order("place_strict_maker", params)
+
         if self.toxic_flow_active and side == "BUY" and not reduce_only:
             logger.warning(f"EXECUTION BLOCKED: TOXIC SELL FLOW DETECTED VIA VPIN. Canceling {quantity} {side}.")
             return None
@@ -125,8 +157,13 @@ class ExecutionEngine:
         Divides a massive execution into smaller market orders, dynamically analyzing 
         the limit order book depth (LOB object) to prevent slippage and market impact.
         """
+        from core.config import DRY_RUN
+        
         logger.warning(f"INITIATING SMART SLICING EXIT for {symbol}: {total_qty} {side}")
         async with self._get_lock(symbol):
+            if DRY_RUN:
+                return self._sim_order("smart_slice_exit", {"symbol": symbol, "side": side, "quantity": str(total_qty), "type": "MARKET"})
+                
             remaining_qty = total_qty
             
             while remaining_qty > Decimal("0"):
@@ -202,11 +239,12 @@ class ExecutionEngine:
                     if info:
                         logger.warning(f"TTL EXPIRED (500ms+): Canceling stale {info['side']} order ID: {stale_oid}")
                         try:
-                            # Drop the passive maker order protecting from adverse selection sweeps
-                            await self.rest.delete_signed("/fapi/v1/order", {
-                                "symbol": info["symbol"],
-                                "origClientOrderId": stale_oid
-                            })
+                            from core.config import DRY_RUN
+                            params = {"symbol": info["symbol"], "origClientOrderId": stale_oid}
+                            if DRY_RUN:
+                                self._sim_order("stale_order_sweeper", params)
+                            else:
+                                await self.rest.delete_signed("/fapi/v1/order", params)
                         except Exception as e:
                             logger.error(f"Failed to drop stale order {stale_oid}: {e}")
                             
@@ -236,7 +274,11 @@ class ExecutionEngine:
                                 "quantity": str(abs(posAmt)),
                                 "newClientOrderId": new_client_order_id
                             }
-                            await self.rest.post_signed("/fapi/v1/order", params)
+                            from core.config import DRY_RUN
+                            if DRY_RUN:
+                                self._sim_order("dust_sweeper_task", params)
+                            else:
+                                await self.rest.post_signed("/fapi/v1/order", params)
             except Exception as e:
                 logger.error(f"Dust sweeper faulted: {e}")
 
@@ -271,8 +313,14 @@ class ExecutionEngine:
 
     async def cancel_all_open_orders(self, symbol: str):
         """Asenkron kalkan (Protokol 100): Sistem kapanmadan once borsadaki tum acik emirleri siler."""
+        from core.config import DRY_RUN
         try:
-            res = await self.rest.delete_signed("/fapi/v1/allOpenOrders", {"symbol": symbol})
+            params = {"symbol": symbol}
+            if DRY_RUN:
+                self._sim_order("cancel_all_open_orders", params)
+                res = {"code": 200, "msg": "Simulated Success"}
+            else:
+                res = await self.rest.delete_signed("/fapi/v1/allOpenOrders", params)
             logger.critical(f"🛑 TUM ACIK EMIRLER IPTAL EDILDI ({symbol})! Borsada orphan emir kalmadi. Sonuc: {res}")
             self.open_orders.clear()
         except Exception as e:
