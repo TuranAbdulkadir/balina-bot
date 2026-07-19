@@ -28,7 +28,17 @@ Built for **24/7 unattended operation** on Oracle Cloud infrastructure with PM2 
 
 ## 🏗️ Architecture
 
+```mermaid
+graph TD
+    MDF[Market Data Feed] --> SG[Signal Generator]
+    SG --> RM[Risk Manager]
+    RM --> EE[Execution Engine]
+    EE --> BAPI[Binance API]
+    BAPI --> PM[Position Monitor]
+    PM --> PT[P&L Tracker]
 ```
+
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        BALINA-BOT RUNTIME                          │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -186,6 +196,7 @@ Copy `.env.example` to `.env` and configure:
 
 ```
 balina_bot/
+├── analysis/               # Offline data analysis and backtesting scripts
 ├── api/                    # FastAPI health & dashboard endpoints
 │   ├── health.py           # /telemetry, /performance, /update
 │   └── dashboard.html      # Live monitoring UI
@@ -194,6 +205,11 @@ balina_bot/
 │   ├── brain_process.py    # Multiprocessing signal worker
 │   ├── audit.py            # Restart & disconnect tracking
 │   └── data_lake/          # Parquet storage (gitignored)
+├── docs/                   # Documentation
+│   ├── ARCHITECTURE.md     # Detailed system design
+│   ├── STRATEGY.md         # Strategy overview
+│   ├── DEPLOYMENT.md       # Oracle Cloud + PM2 guide
+│   └── NEXT_STEPS.md       # Development roadmap
 ├── execution/              # Trade execution layer
 │   ├── engine.py           # Order management & position tracking
 │   └── circuit_breaker.py  # Global circuit breaker
@@ -205,11 +221,8 @@ balina_bot/
 │   └── telegram_bot.py     # Interactive bot + daily reports
 ├── orderbook/              # Order book engine
 │   └── lob.py              # L2 book reconstruction
-├── docs/                   # Documentation
-│   ├── ARCHITECTURE.md     # Detailed system design
-│   ├── STRATEGY.md         # Strategy overview
-│   ├── DEPLOYMENT.md       # Oracle Cloud + PM2 guide
-│   └── NEXT_STEPS.md       # Development roadmap
+├── scripts/                # Utility and helper scripts
+├── storage/                # Parquet data lake storage
 ├── main.py                 # Application entry point
 ├── requirements.txt        # Python dependencies
 └── .env.example            # Environment template
@@ -226,6 +239,15 @@ balina_bot/
 
 ---
 
+## 🧠 What I Learned
+
+Building this production-grade trading bot provided deep hands-on experience with:
+- **Async Programming**: Mastering Python's `asyncio` for non-blocking network I/O, managing concurrent WebSocket streams without thread overhead.
+- **API Integration**: Implementing secure, authenticated communication with Binance Futures, including Ed25519 request signing and rate limit handling.
+- **Risk Management**: Translating mathematical risk models (Kelly Criterion, maximum drawdown halts) into robust fail-safe code that protects capital.
+
+---
+
 ## 📈 Development Journey
 
 This project represents **4+ weeks of intensive development**, evolving through multiple strategy iterations:
@@ -236,6 +258,14 @@ This project represents **4+ weeks of intensive development**, evolving through 
 4. **Current**: Data collection phase — gathering aggTrade data for VPIN-enhanced signal validation
 
 > The honest backtest results and iterative development process are documented in [STRATEGY.md](docs/STRATEGY.md).
+
+---
+
+## 🗺️ Roadmap
+
+- **Planned refactor of main.py (769 lines) into modular service components**
+- **Machine Learning**: Integration of offline-trained ML models for signal validation.
+- **Multi-Pair**: Extending the system to support concurrent multi-pair trading.
 
 ---
 
